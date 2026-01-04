@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Weekly Planner 2026</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Poppins:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Inter', sans-serif; }
+    h1, h2, h3, .year-display { font-family: 'Poppins', sans-serif; }
+    
+    .planner-container {
+      background: linear-gradient(145deg, #1e293b 0%, #0f172a 100%);
+      border-radius: 20px;
+      box-shadow: 
+        0 4px 6px -1px rgba(0, 0, 0, 0.3),
+        0 10px 15px -3px rgba(0, 0, 0, 0.4);
+    }
+    
+    .day-row {
+      transition: all 0.3s ease;
+    }
+    
+    .day-row:hover {
+      transform: translateX(4px);
+      box-shadow: 0 4px 20px -5px rgba(0, 0, 0, 0.4);
+    }
+    
+    .activity-item {
+      transition: all 0.2s ease;
+    }
+    
+    .activity-item:hover {
+      transform: scale(1.02);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    
+    .add-btn {
+      transition: all 0.2s ease;
+    }
+    
+    .add-btn:hover {
+      transform: scale(1.05);
+      background: rgba(255,255,255,0.1);
+    }
+    
+    .time-select {
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 6px center;
+      background-size: 14px;
+      padding-right: 28px;
+    }
+    
+    .modal-overlay {
+      animation: fadeIn 0.2s ease;
+    }
+    
+    .modal-content {
+      animation: slideUp 0.3s ease;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(20px) scale(0.95); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    
+    .color-option {
+      transition: all 0.15s ease;
+    }
+    
+    .color-option:hover {
+      transform: scale(1.15);
+    }
+    
+    .color-option.selected {
+      transform: scale(1.2);
+      box-shadow: 0 0 0 3px white, 0 0 0 5px currentColor;
+    }
+
+    .scrollbar-thin::-webkit-scrollbar {
+      width: 4px;
+    }
+    
+    .scrollbar-thin::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    
+    .scrollbar-thin::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 2px;
+    }
+
+    .year-display {
+      font-weight: 900;
+      letter-spacing: 0.1em;
+    }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-slate-100 via-slate-50 to-slate-100 min-h-screen">
+  <div id="root"></div>
+  
+  <script type="text/babel">
+    const { useState, useRef } = React;
+
+    const WeeklyPlanner = () => {
+      const [currentDate, setCurrentDate] = useState(new Date(2026, 0, 5));
+      const [activities, setActivities] = useState({});
+      const [editingDay, setEditingDay] = useState(null);
+      const [editingActivity, setEditingActivity] = useState(null);
+      const [tempActivity, setTempActivity] = useState({ 
+        startTime: '09:00', 
+        endTime: '10:00', 
+        content: '',
+        color: '#3b82f6'
+      });
+      const [isExporting, setIsExporting] = useState(false);
+      const calendarRef = useRef(null);
+
+      const colorOptions = [
+        { value: '#ef4444', name: 'Red' },
+        { value: '#f97316', name: 'Orange' },
+        { value: '#eab308', name: 'Yellow' },
+        { value: '#22c55e', name: 'Green' },
+        { value: '#06b6d4', name: 'Cyan' },
+        { value: '#3b82f6', name: 'Blue' },
+        { value: '#8b5cf6', name: 'Violet' },
+        { value: '#ec4899', name: 'Pink' },
+        { value: '#6b7280', name: 'Gray' },
+        { value: '#78716c', name: 'Brown' },
+      ];
+
+      const getWeekDates = (date) => {
+        const week = [];
+        const current = new Date(date);
+        const day = current.getDay();
+        const diff = current.getDate() - day + (day === 0 ? -6 : 1);
+        current.setDate(diff);
+        
+        for (let i = 0; i < 7; i++) {
+          week.push(new Date(current));
+          current.setDate(current.getDate() + 1);
+        }
+        return week;
+      };
+
+      const getWeekNumber = (date) => {
+        const target = new Date(date.valueOf());
+        const dayNr = (date.getDay() + 6) % 7;
+        target.setDate(target.getDate() - dayNr + 3);
+        const firstThursday = target.valueOf();
+        target.setMonth(0, 1);
+        if (target.getDay() !== 4) {
+          target.setMonth(0, 1 + ((4 - target.getDay()) + 7) % 7);
+        }
+        return 1 + Math.ceil((firstThursday - target) / 604800000);
+      };
+
+      const getOrdinalSuffix = (n) => {
+        const s = ['th', 'st', 'nd', 'rd'];
+        const v = n % 100;
+        return n + (s[(v - 20) % 10] || s[v] || s[0]);
+      };
+
+      const weekDates = getWeekDates(currentDate);
+      const weekNumber = getWeekNumber(weekDates[0]);
+      const year = weekDates[0].getFullYear();
+      
+      const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      const dayNamesFull = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      
+      const dayColors = [
+        { accent: '#f87171', bg: '#1e1e2e', light: '#2a2a3e' },
+        { accent: '#fb923c', bg: '#1e1e2e', light: '#2a2a3e' },
+        { accent: '#facc15', bg: '#1e1e2e', light: '#2a2a3e' },
+        { accent: '#4ade80', bg: '#1e1e2e', light: '#2a2a3e' },
+        { accent: '#22d3ee', bg: '#1e1e2e', light: '#2a2a3e' },
+        { accent: '#60a5fa', bg: '#1e1e2e', light: '#2a2a3e' },
+        { accent: '#e879f9', bg: '#1e1e2e', light: '#2a2a3e' }
+      ];
+
+      const generateTimeOptions = () => {
+        const times = [];
+        for (let h = 0; h < 24; h++) {
+          for (let m = 0; m < 60; m += 15) {
+            const hour = h.toString().padStart(2, '0');
+            const minute = m.toString().padStart(2, '0');
+            times.push(`${hour}:${minute}`);
+          }
+        }
+        return times;
+      };
+
+      const timeOptions = generateTimeOptions();
+
+      const timeToMinutes = (time) => {
+        const [h, m] = time.split(':').map(Number);
+        return h * 60 + m;
+      };
+
+      const getDayActivities = (dayIndex) => {
+        return (activities[dayIndex] || []).sort((a, b) => 
+          timeToMinutes(a.startTime) - timeToMinutes(b.startTime)
+        );
+      };
+
+      const handleAddActivity = (dayIndex) => {
+        setEditingDay(dayIndex);
+        setEditingActivity(null);
+        setTempActivity({ 
+          startTime: '09:00', 
+          endTime: '10:00', 
+          content: '',
+          color: '#3b82f6'
+        });
+      };
+
+      const handleEditActivity = (dayIndex, activityIndex) => {
+        const activity = activities[dayIndex][activityIndex];
+        setEditingDay(dayIndex);
+        setEditingActivity(activityIndex);
+        setTempActivity({ ...activity });
+      };
+
+      const handleSave = () => {
+        if (!tempActivity.content.trim()) {
+          alert('Please enter activity content');
+          return;
+        }
+        
+        if (timeToMinutes(tempActivity.startTime) >= timeToMinutes(tempActivity.endTime)) {
+          alert('End time must be later than start time');
+          return;
+        }
+
+        setActivities(prev => {
+          const dayActivities = [...(prev[editingDay] || [])];
+          
+          if (editingActivity !== null) {
+            dayActivities[editingActivity] = { ...tempActivity };
+          } else {
+            dayActivities.push({ ...tempActivity, id: Date.now() });
+          }
+          
+          return { ...prev, [editingDay]: dayActivities };
+        });
+        
+        setEditingDay(null);
+        setEditingActivity(null);
+      };
+
+      const handleDelete = () => {
+        if (editingActivity !== null) {
+          setActivities(prev => {
+            const dayActivities = [...(prev[editingDay] || [])];
+            dayActivities.splice(editingActivity, 1);
+            return { ...prev, [editingDay]: dayActivities };
+          });
+        }
+        setEditingDay(null);
+        setEditingActivity(null);
+      };
+
+      const handleCancel = () => {
+        setEditingDay(null);
+        setEditingActivity(null);
+      };
+
+      const navigateWeek = (direction) => {
+        const newDate = new Date(currentDate);
+        newDate.setDate(newDate.getDate() + direction * 7);
+        if (newDate.getFullYear() < 2026) return;
+        setCurrentDate(newDate);
+      };
+
+      const isToday = (date) => {
+        const today = new Date();
+        return date.getDate() === today.getDate() && 
+               date.getMonth() === today.getMonth() && 
+               date.getFullYear() === today.getFullYear();
+      };
+
+      const calculateDuration = (start, end) => {
+        const diff = timeToMinutes(end) - timeToMinutes(start);
+        const hours = Math.floor(diff / 60);
+        const mins = diff % 60;
+        if (hours > 0 && mins > 0) return `${hours}h${mins}m`;
+        if (hours > 0) return `${hours}h`;
+        return `${mins}m`;
+      };
+
+      const formatDateRange = () => {
+        const start = weekDates[0];
+        const end = weekDates[6];
+        return `${start.getMonth() + 1}/${start.getDate()} - ${end.getMonth() + 1}/${end.getDate()}`;
+      };
+
+      const goToToday = () => {
+        const today = new Date();
+        if (today.getFullYear() >= 2026) {
+          setCurrentDate(today);
+        } else {
+          setCurrentDate(new Date(2026, 0, 5));
+        }
+      };
+
+      const exportToImage = async () => {
+        setIsExporting(true);
+        
+        try {
+          const element = calendarRef.current;
+          const canvas = await html2canvas(element, {
+            scale: 2,
+            backgroundColor: '#0f172a',
+            logging: false,
+            useCORS: true,
+            allowTaint: true,
+          });
+          
+          const link = document.createElement('a');
+          link.download = `Weekly_Planner_${year}_Week${weekNumber}.png`;
+          link.href = canvas.toDataURL('image/png');
+          link.click();
+        } catch (error) {
+          console.error('Export failed:', error);
+          alert('Export failed, please try again');
+        } finally {
+          setIsExporting(false);
+        }
+      };
+
+      return (
+        <div className="min-h-screen p-3 md:p-6">
+          <div className="max-w-5xl mx-auto">
+            {/* Control Bar */}
+            <div className="flex flex-col sm:flex-row items-center justify-between mb-5 gap-3 px-2">
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => navigateWeek(-1)}
+                  className="p-2.5 rounded-xl bg-white shadow-md hover:shadow-lg transition-all hover:bg-slate-50 active:scale-95"
+                >
+                  <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                
+                <button 
+                  onClick={goToToday}
+                  className="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all active:scale-95 text-sm"
+                >
+                  📅 Today
+                </button>
+                
+                <button 
+                  onClick={() => navigateWeek(1)}
+                  className="p-2.5 rounded-xl bg-white shadow-md hover:shadow-lg transition-all hover:bg-slate-50 active:scale-95"
+                >
+                  <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+
+              <button 
+                onClick={exportToImage}
+                disabled={isExporting}
+                className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all active:scale-95 flex items-center gap-2 text-sm disabled:opacity-70"
+              >
+                {isExporting ? (
+                  <>
+                    <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Exporting...
+                  </>
+                ) : (
+                  <>🖼️ Export Image</>
+                )}
+              </button>
+            </div>
+
+            {/* Exportable Calendar Area */}
+            <div ref={calendarRef} className="planner-container p-5 md:p-8">
+              {/* Header */}
+              <div className="text-center mb-6">
+                <div className="year-display text-4xl md:text-5xl text-cyan-400 mb-3">
+                  {year}
+                </div>
+                <div className="flex items-center justify-center gap-3 mb-2">
+                  <span className="font-semibold text-emerald-400 text-base md:text-lg">
+                    {getOrdinalSuffix(weekNumber)} Week
+                  </span>
+                  <span className="text-slate-600">|</span>
+                  <span className="font-semibold text-emerald-400 text-base md:text-lg">
+                    {weekDates[0].getMonth() + 1}/{weekDates[0].getDate()} - {weekDates[6].getMonth() + 1}/{weekDates[6].getDate()}
+                  </span>
+                </div>
+                <div className="text-2xl md:text-3xl font-bold text-white tracking-wide">
+                  {weekDates[0].toLocaleDateString('en-US', { month: 'long' })}
+                  {weekDates[0].getMonth() !== weekDates[6].getMonth() && 
+                    ` - ${weekDates[6].toLocaleDateString('en-US', { month: 'long' })}`
+                  }
+                </div>
+              </div>
+
+              {/* Week Rows */}
+              <div className="space-y-3">
+                {weekDates.map((date, dayIndex) => {
+                  const dayActivities = getDayActivities(dayIndex);
+                  const todayClass = isToday(date) ? 'ring-2 ring-blue-400 ring-offset-2' : '';
+                  const colors = dayColors[dayIndex];
+                  
+                  return (
+                    <div 
+                      key={dayIndex} 
+                      className={`day-row rounded-xl overflow-hidden flex ${todayClass}`}
+                      style={{ backgroundColor: colors.bg, border: `1px solid ${colors.light}` }}
+                    >
+                      {/* Left: Date & Day */}
+                      <div 
+                        className="w-24 md:w-32 flex-shrink-0 flex flex-col items-center justify-center py-4 px-3"
+                        style={{ backgroundColor: colors.light }}
+                      >
+                        <div 
+                          className="text-3xl md:text-4xl font-bold"
+                          style={{ color: colors.accent }}
+                        >
+                          {date.getDate()}
+                        </div>
+                        <div 
+                          className="text-sm font-semibold mt-1"
+                          style={{ color: colors.accent, opacity: 0.8 }}
+                        >
+                          {dayNames[dayIndex]}
+                        </div>
+                        {isToday(date) && (
+                          <span 
+                            className="text-xs text-white rounded-full px-2 py-0.5 mt-2"
+                            style={{ backgroundColor: colors.accent }}
+                          >
+                            Today
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Right: Activities */}
+                      <div className="flex-1 p-3 min-h-[100px]">
+                        <div className="flex flex-wrap gap-2 items-start">
+                          {dayActivities.map((activity, actIndex) => (
+                            <div
+                              key={activity.id || actIndex}
+                              onClick={() => handleEditActivity(dayIndex, actIndex)}
+                              className="activity-item rounded-lg p-2 cursor-pointer max-w-[200px]"
+                              style={{ 
+                                backgroundColor: activity.color + '20',
+                                borderLeft: `4px solid ${activity.color}`
+                              }}
+                            >
+                              <div className="flex items-center gap-1 mb-1">
+                                <span 
+                                  className="text-xs font-bold px-1.5 py-0.5 rounded text-white"
+                                  style={{ backgroundColor: activity.color }}
+                                >
+                                  {activity.startTime}
+                                </span>
+                                <span className="text-slate-400 text-xs">→</span>
+                                <span 
+                                  className="text-xs font-bold px-1.5 py-0.5 rounded text-white"
+                                  style={{ backgroundColor: activity.color }}
+                                >
+                                  {activity.endTime}
+                                </span>
+                              </div>
+                              <p className="text-sm text-slate-200 font-medium leading-tight">
+                                {activity.content}
+                              </p>
+                            </div>
+                          ))}
+                          
+                          {/* Add Button */}
+                          <button
+                            onClick={() => handleAddActivity(dayIndex)}
+                            className="add-btn h-[60px] px-4 rounded-lg border-2 border-dashed border-slate-500 text-slate-400 hover:border-slate-400 hover:text-slate-300 transition-all flex items-center justify-center gap-1 text-sm"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                            </svg>
+                            Add
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Footer */}
+              <div className="mt-6 text-center text-slate-500 text-xs border-t border-slate-700 pt-4">
+                ✨ My Weekly Planner ✨
+              </div>
+            </div>
+          </div>
+
+          {/* Edit Modal */}
+          {editingDay !== null && (
+            <div 
+              className="modal-overlay fixed inset-0 bg-black/40 backdrop-blur-sm flex items-start justify-center p-4 z-50 overflow-y-auto"
+              onClick={handleCancel}
+            >
+              <div 
+                className="modal-content bg-white rounded-2xl p-5 w-full max-w-md shadow-2xl my-8"
+                onClick={e => e.stopPropagation()}
+              >
+                <h3 className="text-lg font-bold text-slate-700 mb-5 text-center">
+                  {editingActivity !== null ? '✏️ Edit Activity' : '➕ Add Activity'}
+                  <span className="ml-2 text-sm font-normal text-slate-500">
+                    {weekDates[editingDay].getDate()} / {dayNamesFull[editingDay]}
+                  </span>
+                </h3>
+                
+                <div className="space-y-4">
+                  {/* Time Selection */}
+                  <div className="flex gap-3">
+                    <div className="flex-1">
+                      <label className="block text-sm font-semibold text-slate-600 mb-1.5">
+                        🕐 Start Time
+                      </label>
+                      <select
+                        value={tempActivity.startTime}
+                        onChange={(e) => setTempActivity(prev => ({ ...prev, startTime: e.target.value }))}
+                        className="time-select w-full px-3 py-2.5 border-2 border-slate-200 rounded-xl focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-slate-700 font-medium text-sm"
+                      >
+                        {timeOptions.map(time => (
+                          <option key={time} value={time}>{time}</option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    <div className="flex items-end pb-2.5 text-slate-400">→</div>
+                    
+                    <div className="flex-1">
+                      <label className="block text-sm font-semibold text-slate-600 mb-1.5">
+                        🕐 End Time
+                      </label>
+                      <select
+                        value={tempActivity.endTime}
+                        onChange={(e) => setTempActivity(prev => ({ ...prev, endTime: e.target.value }))}
+                        className="time-select w-full px-3 py-2.5 border-2 border-slate-200 rounded-xl focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-slate-700 font-medium text-sm"
+                      >
+                        {timeOptions.map(time => (
+                          <option key={time} value={time}>{time}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Duration Display */}
+                  {timeToMinutes(tempActivity.endTime) > timeToMinutes(tempActivity.startTime) && (
+                    <div className="text-center text-sm text-slate-500 bg-slate-50 rounded-lg py-1.5">
+                      Duration: <span className="font-semibold text-slate-700">
+                        {calculateDuration(tempActivity.startTime, tempActivity.endTime)}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {/* Color Selection */}
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-600 mb-2">
+                      🎨 Select Color
+                    </label>
+                    <div className="flex flex-wrap gap-2 justify-center p-3 bg-slate-50 rounded-xl">
+                      {colorOptions.map(color => (
+                        <button
+                          key={color.value}
+                          onClick={() => setTempActivity(prev => ({ ...prev, color: color.value }))}
+                          className={`color-option w-8 h-8 rounded-full ${tempActivity.color === color.value ? 'selected' : ''}`}
+                          style={{ backgroundColor: color.value, color: color.value }}
+                          title={color.name}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {/* Content */}
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-600 mb-1.5">
+                      📝 Activity
+                    </label>
+                    <textarea
+                      value={tempActivity.content}
+                      onChange={(e) => setTempActivity(prev => ({ ...prev, content: e.target.value }))}
+                      placeholder="Enter activity..."
+                      className="w-full px-3 py-2.5 border-2 border-slate-200 rounded-xl focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all resize-none text-slate-700 text-sm"
+                      rows={2}
+                    />
+                  </div>
+
+                  {/* Preview */}
+                  {tempActivity.content && (
+                    <div className="p-3 rounded-xl bg-slate-50">
+                      <div className="text-xs text-slate-500 mb-1.5">Preview</div>
+                      <div
+                        className="rounded-lg p-2"
+                        style={{ 
+                          backgroundColor: tempActivity.color + '20',
+                          borderLeft: `4px solid ${tempActivity.color}`
+                        }}
+                      >
+                        <div className="flex items-center gap-1 mb-1">
+                          <span 
+                            className="text-xs font-bold px-1.5 py-0.5 rounded text-white"
+                            style={{ backgroundColor: tempActivity.color }}
+                          >
+                            {tempActivity.startTime}
+                          </span>
+                          <span className="text-slate-400 text-xs">→</span>
+                          <span 
+                            className="text-xs font-bold px-1.5 py-0.5 rounded text-white"
+                            style={{ backgroundColor: tempActivity.color }}
+                          >
+                            {tempActivity.endTime}
+                          </span>
+                        </div>
+                        <p className="text-sm text-slate-700 font-medium">
+                          {tempActivity.content}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="flex gap-2 mt-5">
+                  <button
+                    onClick={handleCancel}
+                    className="flex-1 px-4 py-2.5 border-2 border-slate-200 text-slate-600 rounded-xl font-semibold hover:bg-slate-50 transition-all active:scale-95 text-sm"
+                  >
+                    Cancel
+                  </button>
+                  
+                  {editingActivity !== null && (
+                    <button
+                      onClick={handleDelete}
+                      className="px-4 py-2.5 bg-red-50 border-2 border-red-200 text-red-500 rounded-xl font-semibold hover:bg-red-100 transition-all active:scale-95"
+                    >
+                      🗑️
+                    </button>
+                  )}
+                  
+                  <button
+                    onClick={handleSave}
+                    className="flex-1 px-4 py-2.5 text-white rounded-xl font-semibold shadow-lg transition-all active:scale-95 text-sm"
+                    style={{ backgroundColor: tempActivity.color }}
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    ReactDOM.render(<WeeklyPlanner />, document.getElementById('root'));
+  </script>
+</body>
+</html>
